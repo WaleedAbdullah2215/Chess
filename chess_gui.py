@@ -3,7 +3,7 @@ import sys
 import chess
 from pygame.locals import *
 import time
-from kewgame import ChessGame
+from kewgame import wholeechess  # Import the correct class
 
 # Initialize pygame
 pygame.init()
@@ -24,11 +24,13 @@ HIGHLIGHT = (247, 247, 105, 150)
 MOVE_HIGHLIGHT = (106, 168, 79, 150)
 RED = (255, 0, 0)
 GRAY = (200, 200, 200)
+ACCENT_COLOR = (50, 168, 82)  # Vibrant green for buttons
+SHADOW_COLOR = (30, 30, 30, 100)  # Subtle shadow for depth
 
 # Fonts
-TITLE_FONT = pygame.font.SysFont('Arial', 48)
-BUTTON_FONT = pygame.font.SysFont('Arial', 32)
-MOVE_FONT = pygame.font.SysFont('Arial', 16)
+TITLE_FONT = pygame.font.SysFont('Georgia', 64, bold=True)
+SUBTITLE_FONT = pygame.font.SysFont('Arial', 28, italic=True)
+BUTTON_FONT = pygame.font.SysFont('Arial', 36, bold=True)
 
 class ChessGUI:
     def __init__(self):
@@ -40,7 +42,8 @@ class ChessGUI:
         self.valid_moves = []
         self.game = None
         self.load_images()
-        
+        self.button_scale = 1.0  # For button hover animation
+
     def load_images(self):
         """Load chess piece images"""
         self.piece_images = {}
@@ -57,19 +60,68 @@ class ChessGUI:
                     return
 
     def draw_welcome_screen(self):
-        """Draw the welcome screen"""
-        self.screen.fill(LIGHT_SQUARE)
-        
-        title = TITLE_FONT.render("Welcome to Waleed's Chess Game", True, BLACK)
-        subtitle = BUTTON_FONT.render("Hope you have a great time!", True, BLACK)
+        """Draw a world-class welcome screen"""
+        # Background with gradient
+        gradient = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        for y in range(SCREEN_HEIGHT):
+            t = y / SCREEN_HEIGHT
+            r = int(LIGHT_SQUARE[0] * (1 - t) + DARK_SQUARE[0] * t)
+            g = int(LIGHT_SQUARE[1] * (1 - t) + DARK_SQUARE[1] * t)
+            b = int(LIGHT_SQUARE[2] * (1 - t) + DARK_SQUARE[2] * t)
+            pygame.draw.line(gradient, (r, g, b), (0, y), (SCREEN_WIDTH, y))
+        self.screen.blit(gradient, (0, 0))
+
+        # Chessboard pattern overlay (subtle)
+        square_size = BOARD_SIZE // 8
+        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        for row in range(8):
+            for col in range(8):
+                color = LIGHT_SQUARE if (row + col) % 2 == 0 else DARK_SQUARE
+                color = (*color[:3], 20)  # Low opacity for subtle effect
+                pygame.draw.rect(overlay, color, 
+                                (MARGIN + col * square_size, 
+                                 MARGIN + row * square_size, 
+                                 square_size, square_size))
+        self.screen.blit(overlay, (0, 0))
+
+        # Title with shadow effect
+        title = TITLE_FONT.render("Waleed's Chess Game", True, BLACK)
+        title_shadow = TITLE_FONT.render("Waleed's Chess Game", True, SHADOW_COLOR)
+        self.screen.blit(title_shadow, (SCREEN_WIDTH//2 - title.get_width()//2 + 5, 155))
         self.screen.blit(title, (SCREEN_WIDTH//2 - title.get_width()//2, 150))
-        self.screen.blit(subtitle, (SCREEN_WIDTH//2 - subtitle.get_width()//2, 220))
-        
-        start_button = pygame.Rect(SCREEN_WIDTH//2 - 100, 350, 200, 60)
-        pygame.draw.rect(self.screen, DARK_SQUARE, start_button, border_radius=10)
+
+        # Subtitle with animation (slight pulse)
+        subtitle = SUBTITLE_FONT.render("Master the Board, Challenge the World!", True, BLACK)
+        subtitle_scale = 1.0 + 0.05 * (1 + time.time() % 2)  # Gentle pulse
+        scaled_subtitle = pygame.transform.smoothscale(subtitle, 
+            (int(subtitle.get_width() * subtitle_scale), int(subtitle.get_height() * subtitle_scale)))
+        self.screen.blit(scaled_subtitle, 
+                        (SCREEN_WIDTH//2 - scaled_subtitle.get_width()//2, 250))
+
+        # Start button with hover effect
+        start_button = pygame.Rect(SCREEN_WIDTH//2 - 120 * self.button_scale, 
+                                 350, 240 * self.button_scale, 70 * self.button_scale)
+        pygame.draw.rect(self.screen, SHADOW_COLOR, start_button.move(5, 5), border_radius=15)
+        pygame.draw.rect(self.screen, ACCENT_COLOR, start_button, border_radius=15)
         start_text = BUTTON_FONT.render("Start Game", True, WHITE)
-        self.screen.blit(start_text, (SCREEN_WIDTH//2 - start_text.get_width()//2, 365))
-        
+        self.screen.blit(start_text, 
+                        (SCREEN_WIDTH//2 - start_text.get_width()//2, 
+                         365 - start_text.get_height()//2 + 35 * (self.button_scale - 1)))
+
+        # Decorative chess pieces
+        if self.piece_images:
+            for i, piece in enumerate(['white_king', 'black_queen', 'white_bishop', 'black_knight']):
+                img = self.piece_images.get(piece)
+                if img:
+                    self.screen.blit(img, (MARGIN + i * 150, MARGIN + 400))
+
+        # Update button scale for hover animation
+        mouse_pos = pygame.mouse.get_pos()
+        if start_button.collidepoint(mouse_pos):
+            self.button_scale = min(self.button_scale + 0.02, 1.1)
+        else:
+            self.button_scale = max(self.button_scale - 0.02, 1.0)
+
         return start_button
 
     def draw_board(self):
@@ -208,7 +260,7 @@ class ChessGUI:
         """Let the AI make a move"""
         if self.game.board.turn == chess.BLACK and not self.game.board.is_game_over():
             start_time = time.time()
-            move = self.game.ai.find_best_move(self.game.board)
+            move = self.game.ai.bestMoveornot(self.game.board)
             if move in self.game.board.legal_moves:
                 self.game.board.push(move)
                 print(f"AI moved: {self.game.board.san(move)} (took {time.time() - start_time:.2f}s)")
@@ -225,7 +277,7 @@ class ChessGUI:
                     if self.state == "welcome":
                         start_button = self.draw_welcome_screen()
                         if start_button.collidepoint(event.pos):
-                            self.game = ChessGame()
+                            self.game = wholeechess()  # Use the correct class
                             self.state = "game"
                     
                     elif self.state == "game":
@@ -236,7 +288,7 @@ class ChessGUI:
                     elif self.state == "end":
                         again_button = self.draw_end_screen()
                         if again_button.collidepoint(event.pos):
-                            self.game = ChessGame()
+                            self.game = wholeechess()  # Use the correct class
                             self.state = "game"
                             self.selected_piece = None
                             self.valid_moves = []
